@@ -21,3 +21,10 @@ dev/
 
 # Results file
 results.tsv
+run.log
+
+# macOS
+.DS_Store
+
+# Data cache
+.cache/

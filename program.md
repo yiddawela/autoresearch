@@ -20,7 +20,11 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+Each experiment runs on a single device (NVIDIA GPU, Apple Silicon MPS, or CPU). The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+
+**Platform notes:**
+- On MPS (Apple Silicon): `torch.compile` is disabled, Flash Attention 3 is replaced with PyTorch SDPA, and default hyperparameters are smaller (DEPTH=4, smaller batch sizes).
+- On CUDA: original behavior is preserved (FA3, torch.compile, larger defaults).
 
 **What you CAN do:**
 - Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
