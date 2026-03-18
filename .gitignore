@@ -28,3 +28,12 @@ run.log
 
 # Data cache
 .cache/
+
+# Model weights
+*.pt
+
+# Table cropper outputs
+table_cropper/output*/
+table_cropper/uv.lock
+table_cropper/*.log
+table_cropper/results.tsv
