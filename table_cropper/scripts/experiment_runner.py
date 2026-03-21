@@ -16,6 +16,7 @@ Usage:
     uv run experiment_runner.py --formulation C --linking-mode spatial
 """
 
+import _paths  # noqa: F401
 import argparse
 import json
 import os
@@ -28,6 +29,11 @@ import numpy as np
 import torch
 from PIL import Image
 from tqdm import tqdm
+
+try:
+    from ultralytics import YOLO as _YOLO
+except ImportError:
+    _YOLO = None
 
 from coco_eval import compute_ap, compute_map, compute_iou_distribution
 from completeness_metrics import compute_all_metrics
@@ -49,7 +55,7 @@ DEFAULT_DATA_DIR = os.path.join(
     os.path.expanduser("~"), ".cache", "table_cropper", "SCI-3000"
 )
 DEFAULT_FINETUNED = os.path.join(
-    os.path.expanduser("~"), ".cache", "table_cropper", "checkpoints", "round01_best"
+    os.path.expanduser("~"), ".cache", "table_cropper", "checkpoints", "phase5_resumed_final"
 )
 
 
@@ -126,7 +132,7 @@ def load_val_pages(
     """Load pages from val split (pre-prepared finetune data)."""
     annot_dir = os.path.join(data_dir, "Annotations")
     val_img_dir = os.path.join(
-        os.path.expanduser("~"), ".cache", "table_cropper", "finetune_data", "val", "images"
+        os.path.expanduser("~"), ".cache", "table_cropper", "finetune_data_v3", "val", "images"
     )
 
     if os.path.isdir(val_img_dir):
@@ -381,6 +387,70 @@ def build_gt_components(
 
 
 # ---------------------------------------------------------------------------
+# YOLO detection helper
+# ---------------------------------------------------------------------------
+
+
+def _yolo_detect(image: Image.Image, yolo_model, confidence: float,
+                 table_class_only: bool = False) -> list[dict]:
+    """Run YOLO inference and return detections in the same format as TATR."""
+    results = yolo_model(image, conf=confidence, verbose=False)
+    boxes = results[0].boxes
+    dets = []
+    for box in boxes:
+        cls_id = int(box.cls[0].item())
+        # For multi-class models (Formulation C), optionally filter to table class only
+        if table_class_only and cls_id != 0:
+            continue
+        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+        dets.append({
+            "bbox": (x1, y1, x2, y2),
+            "score": float(box.conf[0].item()),
+            "class": cls_id,
+        })
+    return dets
+
+
+def run_yolo_formulation(
+    image: Image.Image,
+    image_id: str,
+    gt_components: list[dict],
+    yolo_model,
+    confidence: float,
+    result: "FormulationResult",
+    formulation: str,
+):
+    """Run a single formulation using YOLO detection + completeness evaluation."""
+    # For Formulation C, filter to table-class only for the completeness evaluation
+    table_class_only = (formulation == "C")
+    dets = _yolo_detect(image, yolo_model, confidence, table_class_only)
+
+    for gt in gt_components:
+        result.add_gt_merged(image_id, gt["merged_box"])
+        result.add_gt_table_only(image_id, gt["table_box"])
+
+    # For Formulation B, match against merged GT; for A and C, match against table-only GT
+    match_key = "merged_box" if formulation == "B" else "table_box"
+
+    for det in dets:
+        bbox = tuple(det["bbox"])
+        result.add_detection(image_id, bbox, det["score"])
+
+        best_iou, best_gt = 0, None
+        for gt in gt_components:
+            iou = _iou(bbox, gt[match_key])
+            if iou > best_iou:
+                best_iou = iou
+                best_gt = gt
+
+        if best_gt and best_iou >= 0.3:
+            metrics = compute_all_metrics(
+                best_gt["table_box"], best_gt["caption_boxes"], bbox
+            )
+            result.add_completeness(metrics)
+
+
+# ---------------------------------------------------------------------------
 # Main experiment runner
 # ---------------------------------------------------------------------------
 
@@ -394,12 +464,14 @@ def run_experiment(
     confidence: float = 0.5,
     seed: int = 42,
     output_path: str | None = None,
+    detector: str = "tatr",
+    yolo_model_path: str | None = None,
 ) -> dict[str, dict]:
     """Run the full experiment comparing formulations."""
     from pdf2image import convert_from_path
 
     print("=" * 70)
-    print("EXPERIMENT RUNNER")
+    print(f"EXPERIMENT RUNNER ({detector.upper()})")
     print(f"Formulations: {', '.join(formulations)}")
     print("=" * 70)
 
@@ -409,21 +481,33 @@ def run_experiment(
     print(f"  {len(pages)} pages loaded")
 
     # Load models
-    device = get_device()
-    print(f"  Device: {device}")
-
+    yolo_model = None
     models = {}
-    if "A" in formulations or "C" in formulations:
-        print("  Loading pre-trained TATR...")
-        models["pretrained"] = load_model(device)
 
-    if "B" in formulations:
-        if finetuned_path and os.path.isdir(finetuned_path):
-            print(f"  Loading fine-tuned model from {finetuned_path}...")
-            models["finetuned"] = load_model(device, model_path=finetuned_path)
-        else:
-            print("  ⚠ No fine-tuned model; using pre-trained for B")
-            models["finetuned"] = models.get("pretrained", load_model(device))
+    if detector == "yolo":
+        if _YOLO is None:
+            print("Error: ultralytics not installed"); return {}
+        if not yolo_model_path:
+            print("Error: --yolo-model required for YOLO detector"); return {}
+        print(f"  Loading YOLO model from {yolo_model_path}...")
+        yolo_model = _YOLO(yolo_model_path)
+        device = get_device()
+        print(f"  Device: {device}")
+    else:
+        device = get_device()
+        print(f"  Device: {device}")
+
+        if "A" in formulations or "C" in formulations:
+            print("  Loading pre-trained TATR...")
+            models["pretrained"] = load_model(device)
+
+        if "B" in formulations:
+            if finetuned_path and os.path.isdir(finetuned_path):
+                print(f"  Loading fine-tuned model from {finetuned_path}...")
+                models["finetuned"] = load_model(device, model_path=finetuned_path)
+            else:
+                print("  ⚠ No fine-tuned model; using pre-trained for B")
+                models["finetuned"] = models.get("pretrained", load_model(device))
 
     # Initialize results
     results = {}
@@ -473,26 +557,33 @@ def run_experiment(
             if not gt_with_captions:
                 continue
 
-            if "A" in formulations:
-                proc, model = models["pretrained"]
-                run_formulation_a(
-                    image, image_id, gt_with_captions,
-                    proc, model, device, confidence, results["A"]
-                )
+            if detector == "yolo":
+                for f in formulations:
+                    run_yolo_formulation(
+                        image, image_id, gt_with_captions,
+                        yolo_model, confidence, results[f], f
+                    )
+            else:
+                if "A" in formulations:
+                    proc, model = models["pretrained"]
+                    run_formulation_a(
+                        image, image_id, gt_with_captions,
+                        proc, model, device, confidence, results["A"]
+                    )
 
-            if "B" in formulations:
-                proc, model = models["finetuned"]
-                run_formulation_b(
-                    image, image_id, gt_with_captions,
-                    proc, model, device, confidence, results["B"]
-                )
+                if "B" in formulations:
+                    proc, model = models["finetuned"]
+                    run_formulation_b(
+                        image, image_id, gt_with_captions,
+                        proc, model, device, confidence, results["B"]
+                    )
 
-            if "C" in formulations:
-                proc, model = models["pretrained"]
-                run_formulation_c(
-                    image, image_id, gt_with_captions,
-                    proc, model, device, confidence, results["C"]
-                )
+                if "C" in formulations:
+                    proc, model = models["pretrained"]
+                    run_formulation_c(
+                        image, image_id, gt_with_captions,
+                        proc, model, device, confidence, results["C"]
+                    )
 
     # Compute summaries
     print("\n" + "=" * 70)
@@ -561,6 +652,10 @@ def main():
     parser.add_argument("--confidence", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", default=None, help="Save JSON results to this path")
+    parser.add_argument("--detector", default="tatr", choices=["tatr", "yolo"],
+                        help="Detection backbone: tatr (default) or yolo")
+    parser.add_argument("--yolo-model", default=None,
+                        help="Path to YOLO best.pt (required when --detector=yolo)")
     args = parser.parse_args()
 
     if args.formulation == "all":
@@ -577,6 +672,8 @@ def main():
         confidence=args.confidence,
         seed=args.seed,
         output_path=args.output,
+        detector=args.detector,
+        yolo_model_path=args.yolo_model,
     )
 
 

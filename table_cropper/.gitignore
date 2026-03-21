@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Environment
+.env
+
+# Model weights (large; download or train on demand)
+*.pt
+*.pth
+*.onnx
+*.safetensors
+
+# Data (large; downloaded via scripts/download_data.py)
+data/
+
+# Large results cache (regenerate with experiment scripts)
+results/per_table_cache.json
+results/wp3_results.json
+results/robustness_analysis.json
+
+# LaTeX build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.spl
+paper/*.bbl
+paper/*.blg
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/*.toc
+
+# Compiled PDFs (regenerate with pdflatex)
+paper/main.pdf
+paper/cover_letter.pdf
+paper/submission.zip
+
+# Cover letter build artifacts
+paper/cover_letter.aux
+paper/cover_letter.log
+paper/cover_letter.out
+
+# Generated figure source files (keep PDFs in figures/)
+paper/figures/*.png
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Gemini agent artifacts
+.gemini/
+.agents/

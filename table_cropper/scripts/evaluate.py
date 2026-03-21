@@ -13,6 +13,7 @@ Usage:
     uv run evaluate.py --data-dir /path/to/SCI-3000
 """
 
+import _paths  # noqa: F401
 import argparse
 import json
 import os

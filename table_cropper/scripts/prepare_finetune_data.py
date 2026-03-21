@@ -9,6 +9,7 @@ Usage:
     uv run prepare_finetune_data.py --max-pages 200   # quick subset
 """
 
+import _paths  # noqa: F401
 import argparse
 import json
 import os

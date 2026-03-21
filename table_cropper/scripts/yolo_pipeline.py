@@ -30,7 +30,7 @@ DEFAULT_DATA_DIR = os.path.join(
     os.path.expanduser("~"), ".cache", "table_cropper", "SCI-3000"
 )
 FINETUNE_DIR = os.path.join(
-    os.path.expanduser("~"), ".cache", "table_cropper", "finetune_data"
+    os.path.expanduser("~"), ".cache", "table_cropper", "finetune_data_v3"
 )
 YOLO_DATA_DIR = os.path.join(
     os.path.expanduser("~"), ".cache", "table_cropper", "yolo_data"
@@ -280,7 +280,7 @@ def train_yolo(
         project=project_dir,
         name=run_name,
         exist_ok=True,
-        device="mps",  # Apple Silicon
+        device="0",  # CUDA GPU
         patience=10,
         save=True,
         plots=True,

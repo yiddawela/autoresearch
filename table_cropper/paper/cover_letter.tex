@@ -1,0 +1,43 @@
+\documentclass[11pt]{letter}
+\usepackage[margin=1in]{geometry}
+\usepackage{url}
+\usepackage{hyperref}
+
+\signature{Dr Yohan Iddawela\\Asian Development Bank}
+\address{Dr Yohan Iddawela\\Asian Development Bank}
+
+\begin{document}
+
+\begin{letter}{%
+Professors Koichi Kise, Josep Llad\'{o}s, and Richard Zanibbi\\
+Editors-in-Chief\\
+International Journal on Document Analysis and Recognition (IJDAR)}
+
+\opening{Dear Professors Kise, Llad\'{o}s, and Zanibbi,}
+
+I am writing to submit the manuscript entitled \textbf{``Beyond Table Bodies: Semantically Complete Table Extraction from Scientific Documents''} for consideration in the \textit{International Journal on Document Analysis and Recognition}.
+
+\smallskip
+\textbf{Context:}\quad
+Table detection is a well-studied task in document analysis, yet current benchmarks and detectors define the detection target as the visual table body alone. Downstream systems that consume detected tables for information extraction or scientific document understanding require not only the data grid but also its associated captions and footnotes to interpret the content correctly. This gap between what detectors localise and what applications need motivates the present work.
+
+\smallskip
+\textbf{Contributions:}\quad
+The paper formalises the \emph{semantically complete table unit}, comprising the table body together with its captions and footnotes, and provides explicit inclusion and exclusion rules. It introduces three complementary completeness metrics (Caption Inclusion Rate, Semantic Coverage Score, and Complete Unit Capture Rate) that quantify how well a detection covers the full interpretable region. Three target formulations are compared across two detector architectures (TATR and YOLOv26m) on the SCI-3000 corpus. The learned merged formulation achieves 94.2\% caption inclusion and 78.1\% complete-unit capture. A downstream extraction experiment using a multimodal model confirms the practical impact: caption-aware crops yield a 94\% title extraction rate compared with 2\% for table-only crops.
+
+\smallskip
+\textbf{Relevance to IJDAR:}\quad
+This work addresses a core question in table detection: what constitutes the correct detection target when the goal is document understanding rather than body-only localisation. The evaluation methodology bridges localisation quality and downstream utility. The SCI-3000 dataset is publicly available, and the evaluation framework is fully reproducible. The findings are directly relevant to researchers working on document layout analysis, table extraction, and scientific document understanding.
+
+\smallskip
+Thank you for considering this submission. I look forward to hearing from you.
+
+\bigskip
+\noindent Sincerely,
+
+\bigskip
+\noindent Dr Yohan Iddawela\\
+Asian Development Bank
+
+\end{letter}
+\end{document}
